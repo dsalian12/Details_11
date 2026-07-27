@@ -20,6 +20,10 @@ spring:
 server:
   port: ${SERVER_PORT:8080}
 
+logging:
+  level:
+    com.salian.productapi: ${LOG_LEVEL_APP:INFO}
+
 springdoc:
   swagger-ui:
     path: /swagger-ui.html
