@@ -3,6 +3,7 @@ package com.salian.productapi.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -28,6 +29,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataIntegrityViolationException;
 
 @ExtendWith(MockitoExtension.class)
 class ProductServiceTest {
@@ -146,5 +148,33 @@ class ProductServiceTest {
         productService.delete(1L);
 
         verify(productRepository).delete(existing);
+    }
+
+    @Test
+    void createThrowsDuplicateSkuOnUniqueConstraintViolation() {
+        when(productRepository.existsBySku("SKU-1")).thenReturn(false);
+        when(productRepository.save(any(Product.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        doThrow(new DataIntegrityViolationException("duplicate")).when(productRepository).flush();
+
+        assertThatThrownBy(() -> productService.create(request("SKU-1")))
+                .isInstanceOf(DuplicateSkuException.class);
+    }
+
+    @Test
+    void updateThrowsDuplicateSkuOnUniqueConstraintViolation() {
+        Product existing = Product.builder()
+                .id(1L)
+                .sku("SKU-1")
+                .name("Old")
+                .price(new BigDecimal("10.00"))
+                .quantity(1)
+                .build();
+        when(productRepository.findById(1L)).thenReturn(Optional.of(existing));
+        when(productRepository.existsBySku("SKU-2")).thenReturn(false);
+        when(productRepository.save(any(Product.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        doThrow(new DataIntegrityViolationException("duplicate")).when(productRepository).flush();
+
+        assertThatThrownBy(() -> productService.update(1L, request("SKU-2")))
+                .isInstanceOf(DuplicateSkuException.class);
     }
 }

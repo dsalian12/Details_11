@@ -8,6 +8,7 @@ import com.salian.productapi.web.dto.ProductRequest;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -51,9 +52,15 @@ public class ProductService {
                 .price(request.price())
                 .quantity(request.quantity())
                 .build();
-        Product saved = productRepository.save(product);
-        log.info("Created product id={} sku={}", saved.getId(), saved.getSku());
-        return saved;
+        try {
+            Product saved = productRepository.save(product);
+            productRepository.flush();
+            log.info("Created product id={} sku={}", saved.getId(), saved.getSku());
+            return saved;
+        } catch (DataIntegrityViolationException ex) {
+            log.warn("Rejected product creation, sku already exists sku={}", request.sku());
+            throw new DuplicateSkuException(request.sku());
+        }
     }
 
     @Transactional
@@ -69,9 +76,15 @@ public class ProductService {
         product.setDescription(request.description());
         product.setPrice(request.price());
         product.setQuantity(request.quantity());
-        Product saved = productRepository.save(product);
-        log.info("Updated product id={} sku={} quantity={}", saved.getId(), saved.getSku(), saved.getQuantity());
-        return saved;
+        try {
+            Product saved = productRepository.save(product);
+            productRepository.flush();
+            log.info("Updated product id={} sku={} quantity={}", saved.getId(), saved.getSku(), saved.getQuantity());
+            return saved;
+        } catch (DataIntegrityViolationException ex) {
+            log.warn("Rejected product update id={}, sku already exists sku={}", id, request.sku());
+            throw new DuplicateSkuException(request.sku());
+        }
     }
 
     @Transactional
